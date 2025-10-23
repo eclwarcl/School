@@ -1,7 +1,320 @@
-dfghj
-qw
-q
+import tkinter as tk
+from tkinter import ttk 
+from PIL import Image, ImageTk
+import math
+import os
+from pathlib import Path
 
-w
-qw
+# Main Window
+root = tk.Tk()
+root.title("Engineering Problem Solver")
+root.configure(bg="#d6eaff")
 
+
+root.geometry("1400x700") #size of the window that fits screen
+
+style = ttk.Style()
+style.theme_use("clam")
+
+style.configure("TButton", font=("Segoe UI", 11, "bold"), padding=8,
+                relief="flat", background="#2b7de9", foreground="white")
+style.map("TButton", background=[("active", "#1f5cb8")])
+style.configure("TEntry", relief="flat", padding=5, font=("Consolas", 14))
+style.configure("TLabel", background="#d6eaff", font=("Segoe UI", 11))
+style.configure("Card.TFrame", background="#4da3ff", relief="groove")
+
+# Make 4 equal columns that never run off the page
+for c in range(4):
+    root.grid_columnconfigure(c, weight=1, uniform="cols", minsize=320)
+root.grid_rowconfigure(0, weight=1)
+
+def format_result(value):
+    try:
+        if abs(value) < 1e-3 or abs(value) > 1e4:
+            return f"{value:.3e}"
+        else:
+            return f"{value:.3f}"
+    except Exception:
+        return "Error"
+
+# Axial Calcs
+
+def solve_axial():
+    F_val = F_entry.get().strip()
+    A_val = A_entry.get().strip()
+    sigma_val = sigma_entry.get().strip()
+
+    filled = [bool(F_val), bool(A_val), bool(sigma_val)]
+    if filled.count(True) != 2:
+        result_axial.config(text="Enter any 2 of F, A, σ to solve the 3rd.")
+        return
+
+    try:
+        if not F_val:
+            A = float(A_val)
+            sigma = float(sigma_val)
+            F = sigma * A
+            result_axial.config(text=f"F = {format_result(F)} N")
+            equation_axial_calc.config(text=f"F = σ × A\n= {sigma} × {A}")
+        elif not A_val:
+            F = float(F_val)
+            sigma = float(sigma_val)
+            A = F / sigma
+            result_axial.config(text=f"A = {format_result(A)} m²")
+            equation_axial_calc.config(text=f"A = F / σ\n= {F} / {sigma}")
+        elif not sigma_val:
+            F = float(F_val)
+            A = float(A_val)
+            sigma = F / A
+            result_axial.config(text=f"σ = {format_result(sigma)} Pa")
+            equation_axial_calc.config(text=f"σ = F / A\n= {F} / {A}")
+    except ValueError:
+        result_axial.config(text="Invalid input")
+
+def clear_axial():
+    for e in [F_entry, A_entry, sigma_entry]:
+        e.delete(0, tk.END)
+    equation_axial_calc.config(text=equation_axial_default)
+    result_axial.config(text="")
+
+
+# Beam Calcs
+
+def solve_beam():
+    L = L_entry.get().strip()
+    W = W_entry.get().strip()
+    E = E_entry.get().strip()
+    I = I_entry.get().strip()
+    delta = delta_entry.get().strip()
+
+    vals = [bool(L), bool(W), bool(E), bool(I), bool(delta)]
+    if vals.count(True) != 4:
+        result_beam.config(text="Enter any 4 of 5 to solve the 5th.")
+        return
+
+    try:
+        if not delta:
+            L, W, E, I = map(float, [L, W, E, I])
+            delta = (W * L**3) / (48 * E * I)
+            result_beam.config(text=f"δmax = {format_result(delta)} m")
+            equation_beam_calc.config(
+                text=f"δₘₐₓ = ( {W} × {L}³ )\n———————————————\n48 × {E} × {I}"
+            )
+        elif not W:
+            delta, L, E, I = map(float, [delta, L, E, I])
+            W = (delta * 48 * E * I) / (L**3)
+            result_beam.config(text=f"W = {format_result(W)} N")
+            equation_beam_calc.config(
+                text=f"W = ( δₘₐₓ × 48 × {E} × {I} ) / {L}³"
+            )
+        elif not L:
+            delta, W, E, I = map(float, [delta, W, E, I])
+            L = ((delta * 48 * E * I) / W)**(1/3)
+            result_beam.config(text=f"L = {format_result(L)} m")
+            equation_beam_calc.config(
+                text=f"L = (( δₘₐₓ × 48 × {E} × {I} ) / {W})^(1/3)"
+            )
+        elif not E:
+            delta, W, L, I = map(float, [delta, W, L, I])
+            E = (W * L**3) / (48 * I * delta)
+            result_beam.config(text=f"E = {format_result(E)} Pa")
+            equation_beam_calc.config(
+                text=f"E = ( {W} × {L}³ ) / (48 × {I} × {delta})"
+            )
+        elif not I:
+            delta, W, L, E = map(float, [delta, W, L, E])
+            I = (W * L**3) / (48 * E * delta)
+            result_beam.config(text=f"I = {format_result(I)} m⁴")
+            equation_beam_calc.config(
+                text=f"I = ( {W} × {L}³ ) / (48 × {E} × {delta})"
+            )
+    except ValueError:
+        result_beam.config(text="Invalid input")
+
+def clear_beam():
+    for e in [L_entry, W_entry, E_entry, I_entry, delta_entry]:
+        e.delete(0, tk.END)
+    equation_beam_calc.config(text=equation_beam_default)
+    result_beam.config(text="")
+
+# Torsion Calcs
+
+
+def solve_torsion():
+    T_val = T_entry.get().strip()
+    r_val = r_entry.get().strip()
+    L_val = L_entry_tor.get().strip()
+    G_val = G_entry.get().strip()
+    tau_val = tau_entry.get().strip()
+
+    vals = [bool(T_val), bool(r_val), bool(L_val), bool(G_val), bool(tau_val)]
+    if vals.count(True) != 4:
+        result_torsion.config(text="Enter any 4 of 5 to solve the 5th.")
+        return
+
+    try:
+        pi = math.pi
+        if not tau_val:
+            T, r = map(float, [T_val, r_val])
+            tau = (T * r) / ((pi * r**4) / 2)
+            result_torsion.config(text=f"τ = {format_result(tau)} Pa")
+            equation_torsion_calc.config(
+                text=f"τ = ( {T} × {r} )\n———————————————\n(π × {r}⁴) / 2"
+            )
+        elif not T_val:
+            tau, r = map(float, [tau_val, r_val])
+            T = (tau * (pi * r**4) / 2) / r
+            result_torsion.config(text=f"T = {format_result(T)} N·m")
+            equation_torsion_calc.config(
+                text=f"T = ( {tau} × (π × {r}⁴) / 2 ) / {r}"
+            )
+        elif not r_val:
+            T, tau = map(float, [T_val, tau_val])
+            r = ((2 * T) / (pi * tau)) ** (1/3)
+            result_torsion.config(text=f"r = {format_result(r)} m")
+            equation_torsion_calc.config(
+                text=f"r = (( 2 × {T} ) / (π × {tau}))^(1/3)"
+            )
+        elif not L_val:
+            result_torsion.config(text="L is not part of τ formula.")
+            equation_torsion_calc.config(text=equation_torsion_default)
+        elif not G_val:
+            result_torsion.config(text="G not used in this formula.")
+            equation_torsion_calc.config(text=equation_torsion_default)
+    except ValueError:
+        result_torsion.config(text="Invalid input")
+
+def clear_torsion():
+    for e in [T_entry, r_entry, L_entry_tor, G_entry, tau_entry]:
+        e.delete(0, tk.END)
+    equation_torsion_calc.config(text=equation_torsion_default)
+    result_torsion.config(text="")
+
+# layout
+
+frame_axial   = ttk.Frame(root, padding=15, style="Card.TFrame")
+frame_beam    = ttk.Frame(root, padding=15, style="Card.TFrame")
+frame_torsion = ttk.Frame(root, padding=15, style="Card.TFrame")
+frame_visuals = ttk.Frame(root, padding=15, style="Card.TFrame")
+
+# Use the same padding for all frames so left & right “indents” match
+for col, frame in enumerate([frame_axial, frame_beam, frame_torsion, frame_visuals]):
+    frame.grid(row=0, column=col, padx=15, pady=15, sticky="nsew")
+
+#Axail
+
+ttk.Label(frame_axial, text="Axial Loading\nStress, Strain and Deformation",
+          background="#4da3ff", font=("Segoe UI", 14, "bold")).pack(pady=10)
+
+for lbl_text in ["F =", "A =", "σ ="]:
+    ttk.Label(frame_axial, text=lbl_text, background="#4da3ff").pack()
+    entry = ttk.Entry(frame_axial, width=18)
+    entry.pack(pady=3)
+    if lbl_text == "F =": F_entry = entry
+    elif lbl_text == "A =": A_entry = entry
+    elif lbl_text == "σ =": sigma_entry = entry
+
+ttk.Button(frame_axial, text="Click to Solve", command=solve_axial).pack(pady=5)
+ttk.Button(frame_axial, text="Clear", command=clear_axial).pack(pady=2)
+equation_axial_default = "σ = F\n   ———\n   A"
+equation_axial_calc = tk.Label(frame_axial, text=equation_axial_default,
+                               bg="#4da3ff", font=("Consolas", 13), justify="center")
+equation_axial_calc.pack(pady=10)
+result_axial = tk.Label(frame_axial, bg="#4da3ff", fg="black",
+                        font=("Segoe UI", 13, "bold"))
+result_axial.pack(pady=5)
+
+# Beam 
+
+ttk.Label(frame_beam, text="Beam Deflection and Stress Distribution",
+          background="#4da3ff", font=("Segoe UI", 14, "bold")).pack(pady=10)
+
+for lbl_text in ["L =", "W =", "E =", "I =", "δmax ="]:
+    ttk.Label(frame_beam, text=lbl_text, background="#4da3ff").pack()
+    entry = ttk.Entry(frame_beam, width=18)
+    entry.pack(pady=3)
+    if lbl_text == "L =": L_entry = entry
+    elif lbl_text == "W =": W_entry = entry
+    elif lbl_text == "E =": E_entry = entry
+    elif lbl_text == "I =": I_entry = entry
+    elif lbl_text == "δmax =": delta_entry = entry
+
+ttk.Button(frame_beam, text="Click to Solve", command=solve_beam).pack(pady=5)
+ttk.Button(frame_beam, text="Clear", command=clear_beam).pack(pady=2)
+equation_beam_default = "δₘₐₓ = (W × L³)\n———————————————\n48 × E × I"
+equation_beam_calc = tk.Label(frame_beam, text=equation_beam_default,
+                              bg="#4da3ff", font=("Consolas", 13), justify="left")
+equation_beam_calc.pack(pady=10)
+result_beam = tk.Label(frame_beam, bg="#4da3ff", fg="black",
+                       font=("Segoe UI", 13, "bold"))
+result_beam.pack(pady=5)
+
+# Torsion
+
+ttk.Label(frame_torsion, text="Torsion: Shear Stress and Twist",
+          background="#4da3ff", font=("Segoe UI", 14, "bold")).pack(pady=10)
+
+for lbl_text in ["T =", "r =", "L =", "G =", "τ ="]:
+    ttk.Label(frame_torsion, text=lbl_text, background="#4da3ff").pack()
+    entry = ttk.Entry(frame_torsion, width=18)
+    entry.pack(pady=3)
+    if lbl_text == "T =": T_entry = entry
+    elif lbl_text == "r =": r_entry = entry
+    elif lbl_text == "L =": L_entry_tor = entry
+    elif lbl_text == "G =": G_entry = entry
+    elif lbl_text == "τ =": tau_entry = entry
+
+ttk.Button(frame_torsion, text="Click to Solve", command=solve_torsion).pack(pady=5)
+ttk.Button(frame_torsion, text="Clear", command=clear_torsion).pack(pady=2)
+equation_torsion_default = "τ = (T × r)\n———————————————\n(π × r⁴) / 2"
+equation_torsion_calc = tk.Label(frame_torsion, text=equation_torsion_default,
+                                 bg="#4da3ff", font=("Consolas", 13), justify="left")
+equation_torsion_calc.pack(pady=10)
+result_torsion = tk.Label(frame_torsion, bg="#4da3ff", fg="black",
+                          font=("Segoe UI", 13, "bold"))
+result_torsion.pack(pady=5)
+
+# Pictures 
+
+ttk.Label(frame_visuals, text="Visual Aids / Diagrams",
+          background="#4da3ff", font=("Segoe UI", 14, "bold")).pack(pady=10)
+
+def find_image(fname: str) -> Path:
+    base_path = Path(__file__).parent
+    for ext in [".png", ".jpg", ".jpeg"]:
+        candidate = base_path / f"{fname}{ext}"
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(f"Image file '{filename}' not found in {base_path}")
+
+
+def load_and_scale(img_path: Path, max_w=260):
+    img = Image.open(img_path)
+    w, h = img.size
+    if w > max_w:
+        scale = max_w / w
+        img = img.resize((int(w * scale), int(h * scale)))
+    return ImageTk.PhotoImage(img)
+
+try:
+    # source the images
+    axial_path   = find_image("axial_diagram")
+    beam_path    = find_image("beam_diagram")
+    torsion_path = find_image("torsion_diagram")
+
+    imgs = []   
+    labels = ["Axial Loading", "Beam Bending", "Torsion"]
+    for pth, lbl in zip([axial_path, beam_path, torsion_path], labels):
+        tk_img = load_and_scale(pth, max_w=260)
+        ttk.Label(frame_visuals, text=lbl, background="#4da3ff",
+                  font=("Segoe UI", 12, "bold")).pack(pady=(10, 0))
+        w = tk.Label(frame_visuals, image=tk_img, bg="#4da3ff")
+        w.pack(pady=5)
+        imgs.append(tk_img)  # keep references to prevent GC
+    frame_visuals._image_refs = imgs
+
+except Exception as e:
+    ttk.Label(frame_visuals, text=f"Error loading images:\n{e}",
+              background="#4da3ff", font=("Consolas", 10)).pack(pady=20)
+
+root.mainloop()
